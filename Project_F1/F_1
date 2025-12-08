@@ -1,0 +1,13 @@
+import fastf1
+import pandas as pd
+
+fastf1.Cache.enable_cache(r'C:\Users\HP\Python\Project_F1')
+
+years = [2021, 2022, 2023, 2024]
+
+with pd.ExcelWriter('AbuDhabi_GP_Results_2021_2024.xlsx', engine='openpyxl') as excel_writer:
+    for year in years:
+        race = fastf1.get_session(year, 'Abu Dhabi', 'R')
+        race.load()
+        race_results = race.results
+        race_results.to_excel(excel_writer, sheet_name=str(year), index=False)

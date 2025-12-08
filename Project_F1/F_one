@@ -1,0 +1,37 @@
+import fastf1
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+event=fastf1.get_event(2023,20)
+session=event.get_race() 
+session.load()
+
+columns = [
+    'Driver', 'DriverNumber', 'LapTime', 'LapNumber',
+    'Sector1Time', 'Sector2Time', 'Sector3Time',
+    'SpeedI1', 'SpeedI2', 'SpeedFL', 'SpeedST'
+]
+# lap_ver=session.laps.pick_driver('VER')[columns]
+# lap_ham=session.laps.pick_driver('HAM')[columns]
+
+# lap_ver['Driver']='VER'
+# lap_ham['Driver']='HAM'
+
+# combined_laps = pd.concat([lap_ver, lap_ham])
+
+# for col in ['LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time']:
+#     combined_laps[col] = combined_laps[col].dt.total_seconds()
+
+# speed_columns = ['SpeedI1', 'SpeedI2', 'SpeedFL', 'SpeedST']  # list all speed columns with missing values
+
+# for col in speed_columns:
+#     mean_value = combined_laps[col].mean()  # calculate mean excluding NaNs
+#     combined_laps[col] = combined_laps[col].fillna(mean_value)  # fill NaNs with column mean
+
+# combined_laps=combined_laps[combined_laps['LapTime']>0]
+# combined_laps=combined_laps[combined_laps['Sector1Time']>0]
+
+# combined_laps.to_excel('ver_ham_laptimes.xlsx', index=False)
+
