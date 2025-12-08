@@ -1,0 +1,123 @@
+import numpy as np
+import os
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.applications.vgg16 import preprocess_input
+from tensorflow.keras.preprocessing import image as keras_image
+import warnings
+
+# Suppress warnings for cleaner output
+warnings.filterwarnings('ignore')
+
+# ==========================================
+# 1. DATA LOADING (Mock vs Real)
+# ==========================================
+
+def load_data():
+    """
+    CURRENTLY: Generates random noise images for demonstration.
+    TO UPDATE: Replace this logic to load your real images from folders.
+    """
+    # --- MOCK DATA GENERATION (DELETE THIS BLOCK WHEN YOU HAVE REAL DATA) ---
+    print("Generating mock data (random noise)...")
+    num_samples = 200
+    img_size = (224, 224, 3)
+    
+    # Generate random noise images
+    healthy_imgs = np.random.rand(num_samples, *img_size)
+    broken_imgs = np.random.rand(num_samples, *img_size)
+    
+    # Create labels (0 = Healthy, 1 = Broken)
+    X = np.concatenate([healthy_imgs, broken_imgs], axis=0)
+    y = np.concatenate([np.zeros(num_samples), np.ones(num_samples)], axis=0)
+    return X, y
+    # ------------------------------------------------------------------------
+
+    # ### REAL DATA STEP ###
+    # If you have images in folders 'healthy' and 'broken', uncomment and use this:
+    # data_dir = "path/to/your/dataset"
+    # classes = ["healthy", "broken"]
+    # images = []
+    # labels = []
+    # for label_idx, class_name in enumerate(classes):
+    #     class_dir = os.path.join(data_dir, class_name)
+    #     for img_file in os.listdir(class_dir):
+    #         img_path = os.path.join(class_dir, img_file)
+    #         img = keras_image.load_img(img_path, target_size=(224, 224))
+    #         img_array = keras_image.img_to_array(img)
+    #         images.append(img_array)
+    #         labels.append(label_idx)
+    # return np.array(images), np.array(labels)
+
+
+# Load the data
+X_images, y = load_data()
+print(f"Data Loaded: {X_images.shape} images")
+
+# ==========================================
+# 2. FEATURE EXTRACTION (The CNN)
+# ==========================================
+print("Initializing VGG16 Feature Extractor...")
+
+# Load VGG16 without the top layer
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3), pooling='avg')
+base_model.trainable = False # Freeze the model
+
+# Preprocess inputs
+print("Preprocessing images...")
+X_preprocessed = preprocess_input(X_images * 255) # Scale to 0-255 range if inputs are 0-1
+
+# Extract features
+print("Extracting features (this may take a moment)...")
+X_features = base_model.predict(X_preprocessed, verbose=1)
+print(f"Features extracted. Shape: {X_features.shape}")
+
+# ==========================================
+# 3. SVM OPTIMIZATION (The Upgrade)
+# ==========================================
+print("Preparing for SVM training...")
+
+# Scale the features (Crucial for SVM accuracy)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X_features)
+
+# Split into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, stratify=y, random_state=42)
+
+# Define the parameter grid to search
+param_grid = {
+    'C': [0.1, 1, 10, 100],           # Regularization parameter
+    'gamma': ['scale', 0.1, 0.01],    # Kernel coefficient
+    'kernel': ['rbf']                 # Radial Basis Function is usually best for images
+}
+
+print("Starting Grid Search to find best SVM parameters...")
+# Grid Search will try every combination above to find the best one
+grid = GridSearchCV(SVC(random_state=42), param_grid, refit=True, verbose=2, cv=3)
+grid.fit(X_train, y_train)
+
+print(f"\nBest Parameters Found: {grid.best_params_}")
+
+# ==========================================
+# 4. EVALUATION & PREDICTION
+# ==========================================
+
+# The 'grid' object automatically uses the best model found for predictions
+y_pred = grid.predict(X_test)
+
+print("\n--- Final Model Performance ---")
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print(classification_report(y_test, y_pred, zero_division=0))
+
+# Example Prediction on a single test image
+sample_idx = 0
+sample_feature = X_test[sample_idx].reshape(1, -1)
+prediction = grid.predict(sample_feature)
+actual = y_test[sample_idx]
+
+print("\n--- Single Sample Check ---")
+print(f"Predicted Class: {prediction[0]} ({'Broken' if prediction[0]==1 else 'Healthy'})")
+print(f"Actual Class:    {actual} ({'Broken' if actual==1 else 'Healthy'})")

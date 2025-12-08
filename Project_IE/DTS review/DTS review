@@ -1,0 +1,44 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report
+# Read healthy and broken datasets
+healthy_df = pd.read_csv(r'C:\Users\HP\Python\DTS\h30hz70.csv')
+healthy_df['label'] = 0
+broken_df = pd.read_csv(r'C:\Users\HP\Python\DTS\b30hz70.csv')
+broken_df['label'] = 1
+
+# Combine and drop duplicates
+data = pd.concat([healthy_df, broken_df], ignore_index=True)
+data = data.drop_duplicates()
+healthy_sampled = healthy_df.sample(n=500, random_state=42)
+broken_sampled = broken_df.sample(n=500, random_state=42)
+
+data = pd.concat([healthy_sampled, broken_sampled], ignore_index=True)
+data = data.drop_duplicates()
+
+# Select features and target
+feature_cols = ['a1', 'a2', 'a3', 'a4']
+X = data[feature_cols]
+y = data['label']
+
+# Scale features for SVM
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+# Split the data
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, stratify=y, random_state=42)
+
+# Initialize and train SVM with RBF kernel
+clf = SVC(kernel='rbf', C=2.5, gamma='scale', random_state=42)
+clf.fit(X_train, y_train)
+
+# Predict and evaluate
+y_pred = clf.predict(X_test)
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Classification Report:\n", classification_report(y_test, y_pred))
+
+# Predict example on new data
+new_row = X_test[0].reshape(1, -1)
+prediction = clf.predict(new_row)
+print("Prediction for new_row:", prediction)

@@ -1,0 +1,54 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+import numpy as np
+
+# Data Preparation
+simulated_file = r'C:\Users\HP\Python\Project_IE\supermarket_simulation_data.csv'
+df = pd.read_csv(simulated_file)
+
+df['arrival_time'] = pd.to_datetime(df['arrival_time'])
+df['finish_time'] = pd.to_datetime(df['finish_time'])
+df['total_time_in_system'] = (df['finish_time'] - df['arrival_time']).dt.total_seconds() / 60
+df['hour_of_day'] = df['arrival_time'].dt.hour
+
+# Feature Scaling (Important for Linear Regression)
+max_items = df['items_in_cart'].max()
+max_hour = df['hour_of_day'].max()
+
+df['items_in_cart_scaled'] = df['items_in_cart'] / max_items
+df['hour_of_day_scaled'] = df['hour_of_day'] / max_hour
+
+features = ['hour_of_day_scaled', 'items_in_cart_scaled']
+target = 'total_time_in_system'
+X = df[features]
+y = df[target]
+
+# Split Data for Training and Testing
+x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=30)
+
+# Train the Linear Regression Model
+model = LinearRegression()
+
+model.fit(x_train, y_train)
+
+# Evaluate the Model
+score = model.score(x_test, y_test)
+print(f"Model R-squared Score (Linear Regression): {score:.3f}")
+
+# Make a Prediction and Apply Logic
+new_hour = 10
+new_items = 35
+
+# Remember to scale the inputs
+scaled_hour = new_hour / max_hour
+scaled_items = new_items / max_items
+
+k = model.predict([[scaled_hour, scaled_items]])
+predicted_time = k[0] 
+print(f"\nPredicted total time for {new_items} items at {new_hour}:00 is {predicted_time:.2f} minutes.")
+
+if predicted_time > 3:
+    print("Decision: Please move to an empty counter.")
+else:
+    print("Decision: Stay in the same counter.")
