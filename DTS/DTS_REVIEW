@@ -1,0 +1,36 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+
+# Read healthy and broken datasets
+healthy_df = pd.read_csv(r'C:\Users\HP\Python\DTS\h30hz70.csv')
+healthy_df['label'] = 0
+broken_df = pd.read_csv(r'C:\Users\HP\Python\DTS\b30hz70.csv')
+broken_df['label'] = 1
+
+# Combine and deduplicate
+data = pd.concat([healthy_df, broken_df], ignore_index=True)
+data = data.drop_duplicates()
+
+# Feature columns and target
+feature_cols = ['a1', 'a2', 'a3', 'a4']
+X = data[feature_cols]
+y = data['label']
+
+# Train/test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+
+# Train model
+clf = RandomForestClassifier(n_estimators=10, max_depth=5, random_state=42)
+clf.fit(X_train, y_train)
+
+# Evaluate
+y_pred = clf.predict(X_test)
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Classification Report:\n", classification_report(y_test, y_pred))
+
+# Predict on a new sample row from test set (avoid undefined variables)
+new_row = X_test.iloc[0].values  # get first row in test set as example
+prediction = clf.predict([new_row])
+print("Prediction for new_row:", prediction)
