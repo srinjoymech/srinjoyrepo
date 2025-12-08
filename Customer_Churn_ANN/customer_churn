@@ -1,0 +1,9 @@
+import pandas as pd
+from matplotlib import pyplot as plt
+import numpy as np
+
+df=pd.read_csv(r"C:\Users\HP\Python\Customer_Churn_ANN\customer-churn.csv")
+df.head()
+
+df.drop("customerID",axis='columns',inplace=True)
+print(df.head())
