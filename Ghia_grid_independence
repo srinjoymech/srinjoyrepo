@@ -1,0 +1,56 @@
+import pandas as pd
+import numpy as np
+
+def calculate_rmse():
+    # ---------------------------------------------------------
+    # 1. Setup File Paths (CHANGE THESE TO YOUR ACTUAL PATHS)
+    # ---------------------------------------------------------
+    # Example: file_65 = r"C:\Users\HP\Documents\CFD\x_vel_65.txt"
+    file_65 = r"E:\Ansys\Cavity_flow_files\x_vel_65.txt"
+    file_129 = r"E:\Ansys\Cavity_flow_files\x_vel.txt"
+    file_257 = r"E:\Ansys\Cavity_flow_files\x_vel_257.txt"
+
+    # ---------------------------------------------------------
+    # 2. Define Helper Function to Calculate RMSE
+    # ---------------------------------------------------------
+    def get_error(filename):
+        try:
+            # Load data (handles spaces or tabs automatically)
+            df = pd.read_csv(filename, sep=r'\s+')
+            df.columns = df.columns.str.strip() # Fix column names
+            
+            # Normalize
+            L = 0.1
+            U_lid = 1.5
+            y_sim = df['y-coordinate'].values / L
+            u_sim = df['x-velocity'].values / U_lid
+            
+            # Sort by y for interpolation
+            sort_idx = np.argsort(y_sim)
+            y_sim, u_sim = y_sim[sort_idx], u_sim[sort_idx]
+            
+            # Ghia (1982) Re=7500 Data
+            ghia_y = [1.0000, 0.9766, 0.9688, 0.9609, 0.9531, 0.8516, 0.7344, 0.6172, 
+                      0.5000, 0.4531, 0.2813, 0.1719, 0.1016, 0.0703, 0.0625, 0.0547, 0.0000]
+            ghia_u = [1.00000, 0.47221, 0.47783, 0.48070, 0.47804, 0.34635, 0.20673, 0.08344, 
+                      0.03111, -0.07540, -0.23186, -0.32709, -0.38000, -0.41657, -0.42537, -0.42735, 0.00000]
+            
+            # Interpolate Simulation to Ghia locations
+            u_interp = np.interp(ghia_y, y_sim, u_sim)
+            
+            # Calculate RMSE
+            mse = np.mean((u_interp - ghia_u)**2)
+            return np.sqrt(mse)
+            
+        except Exception as e:
+            return f"Error: {e}"
+
+    # ---------------------------------------------------------
+    # 3. Compute and Print
+    # ---------------------------------------------------------
+    print(f"Grid 65x65 RMSE:   {get_error(file_65)}")
+    print(f"Grid 129x129 RMSE: {get_error(file_129)}")
+    print(f"Grid 257x257 RMSE: {get_error(file_257)}")
+
+if __name__ == "__main__":
+    calculate_rmse()

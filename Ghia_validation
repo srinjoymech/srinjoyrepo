@@ -1,0 +1,74 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def plot_ghia_validation_high_re():
+    # ---------------------------------------------------------
+    # 1. Load User Data
+    # ---------------------------------------------------------
+    try:
+        df_u = pd.read_csv(r'E:\Ansys\Cavity_flow_files\dp0\FFF\Fluent\x_vel', sep=r'\s+') 
+        df_v = pd.read_csv(r'E:\Ansys\Cavity_flow_files\dp0\FFF\Fluent\y_vel', sep=',')    
+        df_u.columns = df_u.columns.str.strip()
+        df_v.columns = df_v.columns.str.strip()
+    except FileNotFoundError:
+        print("Error: Files 'x_vel' or 'y_vel' not found.")
+        return
+
+    # ---------------------------------------------------------
+    # 2. Normalize User Data
+    # ---------------------------------------------------------
+    L = 0.1         # Domain length
+    U_lid = 1.5     # Lid velocity
+
+    y_plot = df_u['y-coordinate'] / L
+    u_plot = df_u['x-velocity'] / U_lid
+
+    x_plot = df_v['x-coordinate'] / L
+    v_plot = df_v['y-velocity'] / U_lid
+
+    # ---------------------------------------------------------
+    # 3. Ghia (1982) Reference Data (17 points)
+    # ---------------------------------------------------------
+    
+    # U-Velocity (Vertical Centerline)
+    ghia_u_y = [1.0000, 0.9766, 0.9688, 0.9609, 0.9531, 0.8516, 0.7344, 0.6172, 0.5000, 0.4531, 0.2813, 0.1719, 0.1016, 0.0703, 0.0625, 0.0547, 0.0000]
+    
+    ghia_u_re7500 = [1.00000, 0.47244, 0.47048, 0.47323, 0.47167, 0.34228, 0.20591, 0.08342, -0.03800, -0.07503, -0.23176, -0.32393, -0.38324, -0.43025, -0.43590, -0.43154, 0.00000]
+    ghia_u_re10000 = [1.00000, 0.47221, 0.47783, 0.48070, 0.47804, 0.34635, 0.20673, 0.08344, 0.03111, -0.07540, -0.23186, -0.32709, -0.38000, -0.41657, -0.42537, -0.42735, 0.00000]
+
+    # V-Velocity (Horizontal Centerline)
+    ghia_v_x = [1.0000, 0.9688, 0.9609, 0.9531, 0.9453, 0.9063, 0.8594, 0.8047, 0.5000, 0.2344, 0.2266, 0.1563, 0.0938, 0.0781, 0.0703, 0.0625, 0.0000]
+    
+    ghia_v_re7500 = [0.00000, -0.53858, -0.55216, -0.52347, -0.48590, -0.41050, -0.36213, -0.30448, 0.00824, 0.27348, 0.28117, 0.35060, 0.41824, 0.43564, 0.44030, 0.43979, 0.00000]
+    ghia_v_re10000 = [0.00000, -0.54302, -0.52987, -0.49099, -0.45863, -0.41496, -0.36737, -0.30719, 0.00831, 0.27224, 0.28003, 0.35070, 0.41487, 0.43124, 0.43733, 0.43983, 0.00000]
+
+    # ---------------------------------------------------------
+    # 4. Create Plots
+    # ---------------------------------------------------------
+    fig, ax = plt.subplots(1, 2, figsize=(14, 6))
+
+    # Plot 1: U-Velocity
+    ax[0].plot(u_plot, y_plot, 'k-', linewidth=2, label='Your Simulation')
+    ax[0].scatter(ghia_u_re7500, ghia_u_y, marker='o', facecolors='none', edgecolors='orange', label='Ghia Re=7500')
+    ax[0].scatter(ghia_u_re10000, ghia_u_y, marker='^', facecolors='none', edgecolors='purple', label='Ghia Re=10000')
+    ax[0].set_title('Vertical Centerline U-Velocity')
+    ax[0].set_xlabel('u / U_lid')
+    ax[0].set_ylabel('y / L')
+    ax[0].legend()
+    ax[0].grid(True, linestyle='--', alpha=0.6)
+
+    # Plot 2: V-Velocity
+    ax[1].plot(x_plot, v_plot, 'k-', linewidth=2, label='Your Simulation')
+    ax[1].scatter(ghia_v_x, ghia_v_re7500, marker='o', facecolors='none', edgecolors='orange', label='Ghia Re=7500')
+    ax[1].scatter(ghia_v_x, ghia_v_re10000, marker='^', facecolors='none', edgecolors='purple', label='Ghia Re=10000')
+    ax[1].set_title('Horizontal Centerline V-Velocity')
+    ax[1].set_xlabel('x / L')
+    ax[1].set_ylabel('v / U_lid')
+    ax[1].legend()
+    ax[1].grid(True, linestyle='--', alpha=0.6)
+
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    plot_ghia_validation_high_re()
