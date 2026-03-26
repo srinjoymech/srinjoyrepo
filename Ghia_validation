@@ -72,3 +72,5 @@ def plot_ghia_validation_high_re():
 
 if __name__ == "__main__":
     plot_ghia_validation_high_re()
+
+
