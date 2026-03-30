@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
-df=pd.read_csv("insurance_data.csv")
+df=pd.read_csv(r"C:\Users\HP\OneDrive\Documents\GitHub\srinjoyrepo\Insurance\insurance_data.csv")
 df.head()
 
 # plt.scatter(df.age,df.bought_insurance)
