@@ -1,0 +1,94 @@
+import pandas as pd
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+# ==============================================================================
+# STEP 1: LOAD AND PREPARE THE DATA
+# ==============================================================================
+# Load the CSV file containing your 30 simulation results
+df = pd.read_csv(r"E:\Project_Capstone\Project Docs\Discharge_Temp, Discharge_SOC, Char.csv")
+
+# Strip any accidental spaces from the column headers
+df.columns = df.columns.str.strip()
+
+# Define Inputs (X): Base PCM, Nanoparticle Type, Percentage, EG Added
+X = df[['PCM', 'NP', 'NP_Percentage', 'EG']].values
+
+# Define Outputs (y): Discharge Temp, Discharge SOC, Charge Temp, Charge SOC
+y = df[['Discharge_Temp', 'Discharge_SOC', 'Charge_Temp', 'Charge_SOC']].values
+
+# Scale the inputs so the ML model treats all variables evenly
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# ==============================================================================
+# STEP 2: TRAIN THE MACHINE LEARNING MODEL
+# ==============================================================================
+# Initialize the Random Forest Regressor
+# n_estimators=100 means it builds 100 decision trees to ensure accuracy
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+
+# Train the model on your 30 data points
+model.fit(X_scaled, y)
+
+# Calculate how accurately the model learned the physics of your system
+accuracy = model.score(X_scaled, y)
+print(f"Machine Learning Model Trained! Accuracy (R^2): {accuracy * 100:.1f}%\n")
+
+# ==============================================================================
+# INSERT THE NEW CODE HERE! (Evaluate the Errors)
+# ==============================================================================
+# Ask the model to predict the results for the data it just learned
+predictions = model.predict(X_scaled)
+
+# Calculate MAE and RMSE
+mae = mean_absolute_error(y, predictions)
+rmse = np.sqrt(mean_squared_error(y, predictions))
+
+# Print the results for your report
+print("--- ERROR METRICS ---")
+print(f"Mean Absolute Error (MAE):  {mae:.3f}")
+print(f"Root Mean Sq Error (RMSE):  {rmse:.3f}\n")
+
+# ==============================================================================
+# STEP 3: RUN THE OPTIMIZATION
+# ==============================================================================
+print("--- RUNNING OPTIMIZATION ---")
+print("Goal: Find the exact Al2O3 percentage to minimize Discharge Temperature in R35 + EG\n")
+
+# Setup variables to track the best results
+best_temp = float('inf')
+best_percentage = 0
+best_soc = 0
+
+# Create an array of test percentages from 0.0% to 10.0% in 0.1% steps
+test_percentages = np.arange(0.0, 10.1, 0.1)
+
+# Loop through every single percentage
+for p in test_percentages:
+    
+    # Define the theoretical input: [PCM=1 (R35), NP=1 (Al2O3), Percentage=p, EG=1 (Yes)]
+    # You can change these numbers to optimize different materials!
+    # For example, for N-eicosane + CuO, use: [0, 2, p, 0]
+    test_input = np.array([[1, 1, p, 5]])
+    test_input_scaled = scaler.transform(test_input)
+    
+    # Predict the outputs instantly
+    prediction = model.predict(test_input_scaled)[0]
+    
+    pred_discharge_temp = prediction[0]
+    pred_discharge_soc = prediction[1]
+    
+    # If the predicted temperature is cooler than our current best, save it
+    if pred_discharge_temp < best_temp:
+        best_temp = pred_discharge_temp
+        best_percentage = p
+        best_soc = pred_discharge_soc
+
+# ==============================================================================
+# STEP 4: PRINT THE FINAL OPTIMAL RESULTS
+# ==============================================================================
+print(f"Optimal Nanoparticle Concentration:  {best_percentage:.1f}%")
+print(f"Predicted Lowest Discharge Temp:     {best_temp:.2f} K")
+print(f"Predicted State of Charge (SOC):     {best_soc:.3f}")

@@ -1,0 +1,114 @@
+import pandas as pd
+import numpy as np
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import warnings
+warnings.filterwarnings('ignore') # Hides annoying warning messages
+
+# ==============================================================================
+# STEP 1: LOAD AND PREPARE THE DATA
+# ==============================================================================
+# Load the CSV file
+df = pd.read_csv(r"E:\Project_Capstone\Project Docs\Discharge_Temp, Discharge_SOC, Char.csv")
+df.columns = df.columns.str.strip()
+
+# Inputs (X) and Outputs (y)
+X = df[['PCM', 'NP', 'NP_Percentage', 'EG']].values
+y = df[['Discharge_Temp', 'Discharge_SOC', 'Charge_Temp', 'Charge_SOC']].values
+
+# Scale the inputs
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# ==============================================================================
+# STEP 2: THE "ANN" (Artificial Neural Network)
+# ==============================================================================
+# We use solver='lbfgs' which is a special mathematical solver for small datasets
+ann_model = MLPRegressor(hidden_layer_sizes=(10, 5), solver='lbfgs', max_iter=2000, random_state=42)
+
+# Train the ANN
+ann_model.fit(X_scaled, y)
+
+# Evaluate the ANN Error metrics
+predictions = ann_model.predict(X_scaled)
+mae = mean_absolute_error(y, predictions)
+rmse = np.sqrt(mean_squared_error(y, predictions))
+
+print(f"ANN Model Trained! Accuracy (R^2): {ann_model.score(X_scaled, y) * 100:.1f}%")
+print(f"Mean Absolute Error (MAE):         {mae:.3f}")
+print(f"Root Mean Sq Error (RMSE):         {rmse:.3f}\n")
+
+# ==============================================================================
+# STEP 3: THE "GA" (Genetic Algorithm)
+# ==============================================================================
+print("--- RUNNING GENETIC ALGORITHM (GA) ---")
+
+# Define what we are optimizing (Example: R35 + Al2O3 + EG)
+# PCM: 0=Neicosane, 1=R35 | NP: 1=Al2O3, 2=CuO, 3=TiO2 | EG: 0=No, 1=Yes
+TARGET_PCM = 1
+TARGET_NP = 1
+TARGET_EG = 1
+
+# GA Configuration
+POPULATION_SIZE = 50
+GENERATIONS = 100
+MUTATION_RATE = 0.15
+
+# Step 3A: Initialize a random population of Nanoparticle Percentages (0% to 10%)
+population = np.random.uniform(0.0, 10.0, POPULATION_SIZE)
+
+# Track the absolute best recipe
+best_overall_temp = float('inf')
+best_overall_p = 0
+best_overall_soc = 0
+
+for gen in range(GENERATIONS):
+    fitness_scores = []
+    
+    # Step 3B: Fitness Evaluation (Ask the ANN how good each percentage is)
+    for p in population:
+        test_input = np.array([[TARGET_PCM, TARGET_NP, p, TARGET_EG]])
+        test_input_scaled = scaler.transform(test_input)
+        
+        # ANN predicts the physics
+        pred = ann_model.predict(test_input_scaled)[0]
+        pred_temp = pred[0]  # We want to minimize Discharge Temp
+        pred_soc = pred[1]
+        
+        fitness_scores.append(pred_temp)
+        
+        # Save the best one we ever see
+        if pred_temp < best_overall_temp:
+            best_overall_temp = pred_temp
+            best_overall_p = p
+            best_overall_soc = pred_soc
+            
+    # Step 3C: Selection (Kill the hottest 50%, keep the coolest 50%)
+    sorted_indices = np.argsort(fitness_scores)
+    population = population[sorted_indices]
+    parents = population[:POPULATION_SIZE // 2]
+    
+    # Step 3D: Crossover (Parents mate to create children)
+    children = []
+    while len(children) < (POPULATION_SIZE // 2):
+        p1, p2 = np.random.choice(parents, 2, replace=False)
+        child = (p1 + p2) / 2.0  # Child is the average of two good parents
+        children.append(child)
+        
+    # Step 3E: Mutation (Randomly tweak children to explore new percentages)
+    for i in range(len(children)):
+        if np.random.rand() < MUTATION_RATE:
+            mutation_shift = np.random.uniform(-0.5, 0.5)
+            # Ensure the percentage stays between 0% and 10%
+            children[i] = np.clip(children[i] + mutation_shift, 0.0, 10.0)
+            
+    # Combine parents and children for the next generation
+    population = np.concatenate((parents, children))
+
+# ==============================================================================
+# STEP 4: PRINT FINAL RESULTS
+# ==============================================================================
+print(f"GA Optimal Nanoparticle Concentration:  {best_overall_p:.2f}%")
+print(f"ANN Predicted Lowest Discharge Temp:    {best_overall_temp:.2f} K")
+print(f"ANN Predicted State of Charge (SOC):    {best_overall_soc:.3f}")
