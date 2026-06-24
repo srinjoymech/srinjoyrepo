@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -112,4 +113,120 @@ plt.grid(True, linestyle='--', alpha=0.7)
 
 # Save the graph
 plt.savefig('Global_Optimization_Comparison.png', dpi=300, bbox_inches='tight')
+=======
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+from sklearn.preprocessing import StandardScaler
+import warnings
+warnings.filterwarnings('ignore')
+
+# ==============================================================================
+# 1. LOAD DATA & TRAIN GPR
+# ==============================================================================
+df = pd.read_csv(r"E:\Project_Capstone\Project Docs\Discharge_Temp, Discharge_SOC, Char.csv")
+df.columns = df.columns.str.strip()
+
+X = df[['PCM', 'NP', 'NP_Percentage', 'EG']].values
+y = df[['Discharge_Temp', 'Discharge_SOC', 'Charge_Temp', 'Charge_SOC']].values
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+kernel = C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2))
+model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9, alpha=0.1, normalize_y=True)
+model.fit(X_scaled, y)
+
+# ==============================================================================
+# 2. GLOBAL OPTIMIZATION (Test EVERY combination)
+# ==============================================================================
+print("--- RUNNING GLOBAL THERMAL OPTIMIZATION ---\n")
+
+pcms = [0, 1, 2]       # 0: N-eicosane, 1: R35, 2: (Your 3rd PCM)
+nps = [1, 2, 3]        # 1: Al2O3, 2: CuO, 3: TiO2
+egs = [0, 5]           # 0: No EG, 5: 5% EG
+test_percentages = np.arange(0.0, 10.1, 0.1)
+
+# List to store every single result
+all_results = []
+
+# Loop through every material combination
+for pcm in pcms:
+    for np_type in nps:
+        for eg in egs:
+            best_temp_for_combo = float('inf')
+            best_p_for_combo = 0
+            best_soc_for_combo = 0
+            
+            # Find the best percentage for this specific combo
+            for p in test_percentages:
+                test_input = np.array([[pcm, np_type, p, eg]])
+                test_input_scaled = scaler.transform(test_input)
+                pred = model.predict(test_input_scaled)[0]
+                
+                if pred[0] < best_temp_for_combo:
+                    best_temp_for_combo = pred[0]
+                    best_p_for_combo = p
+                    best_soc_for_combo = pred[1]
+            
+            # Save the best result for this combo
+            all_results.append({
+                'PCM': pcm, 'NP': np_type, 'EG': eg, 
+                'Best_P': best_p_for_combo, 
+                'Min_Temp': best_temp_for_combo,
+                'SOC': best_soc_for_combo
+            })
+
+# Sort all results from coldest to hottest
+results_df = pd.DataFrame(all_results).sort_values(by='Min_Temp')
+
+# The absolute best global configuration is at the top!
+winner = results_df.iloc[0]
+print("🏆 THE ULTIMATE OPTIMAL BATTERY CONFIGURATION 🏆")
+print("--------------------------------------------------")
+print(f"Base PCM Material : {int(winner['PCM'])}")
+print(f"Nanoparticle Type : {int(winner['NP'])}")
+print(f"Expanded Graphite : {int(winner['EG'])}%")
+print(f"Optimal NP Conc.  : {winner['Best_P']:.2f}%")
+print(f"-> Lowest Temp    : {winner['Min_Temp']:.2f} K")
+print(f"-> Expected SOC   : {winner['SOC']:.3f}\n")
+
+# ==============================================================================
+# 3. GENERATE THE MULTI-CURVE GRAPH
+# ==============================================================================
+plt.figure(figsize=(12, 7))
+
+# We will graph the Top 3 best material combinations to compare them
+colors = ['red', 'blue', 'green']
+labels = ['1st Place', '2nd Place', '3rd Place']
+
+for i in range(3):
+    combo = results_df.iloc[i]
+    temps_to_plot = []
+    
+    # Calculate the full curve for this specific combination
+    for p in test_percentages:
+        test_input = np.array([[combo['PCM'], combo['NP'], p, combo['EG']]])
+        pred = model.predict(scaler.transform(test_input))[0]
+        temps_to_plot.append(pred[0])
+        
+    # Plot the curve
+    plt.plot(test_percentages, temps_to_plot, color=colors[i], linewidth=2.5, 
+             label=f"{labels[i]}: PCM {int(combo['PCM'])}, NP {int(combo['NP'])}, EG {int(combo['EG'])}%")
+    
+    # Put a star at the optimal point
+    plt.scatter([combo['Best_P']], [combo['Min_Temp']], color=colors[i], marker='*', s=200, zorder=5)
+
+# Formatting the Graph for your thesis
+plt.title('Global Thermal Optimization: Top 3 Battery Configurations', fontsize=16, fontweight='bold')
+plt.xlabel('Nanoparticle Concentration (%)', fontsize=14)
+plt.ylabel('Peak Discharge Temperature (K)', fontsize=14)
+plt.legend(fontsize=12, loc='upper right')
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# Save the graph
+plt.savefig('Global_Optimization_Comparison.png', dpi=300, bbox_inches='tight')
+>>>>>>> 5e255b85b3c975876b017cc5b0e06827e7ad8050
 print("✅ Graph successfully saved as 'Global_Optimization_Comparison.png'!")
