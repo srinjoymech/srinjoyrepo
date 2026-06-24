@@ -1,0 +1,299 @@
+import pandas as pd
+import numpy as np
+import os
+import glob
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import warnings
+warnings.filterwarnings('ignore')
+
+# ==============================================================================
+# 1. LOAD DATA & EXTRACT BOTH TEMP AND SOC (WITH X-RAY DEBUGGING)
+# ==============================================================================
+print("Scanning folders for transient data...")
+
+# Make sure this folder contains ALL 30 of your files (or subfolders with them)
+folder_path = r'C:\Users\HP\OneDrive\Documents\MATLAB\Examples\R2025a\simscapebattery\BatteryCCCVExample\Plots'
+
+# We changed this to look for BOTH .csv and .xlsx just in case!
+all_csv = glob.glob(os.path.join(folder_path, '**', '*.csv'), recursive=True)
+all_xlsx = glob.glob(os.path.join(folder_path, '**', '*.xlsx'), recursive=True)
+all_files = all_csv + all_xlsx
+
+# --- THE X-RAY PRINT ---
+print("-" * 50)
+print(f"Python found exactly {len(all_files)} files to read!")
+for i, file in enumerate(all_files):
+    print(f"  {i+1}. {os.path.basename(file)}")
+print("-" * 50)
+
+X_list = []
+y_list = []
+
+for file in all_files:
+    filename = os.path.basename(file).lower()
+    path_lower = file.lower() # This looks at the full folder path!
+    
+    # Read CSV or Excel automatically
+    if file.endswith('.csv'):
+        df = pd.read_csv(file, encoding='utf-8-sig')
+    else:
+        df = pd.read_excel(file)
+        
+    df.columns = df.columns.str.strip() 
+    
+    # -------------------------------------------------------------
+    # BULLETPROOF METADATA EXTRACTION
+    # -------------------------------------------------------------
+    # 1. Determine PCM and EG based on Folder/File names
+    if 'neicosane' in path_lower or 'nei' in filename:
+        pcm = 0
+        eg = 0
+    elif 'rteg' in path_lower:  # RT35 + 5% EG
+        pcm = 1
+        eg = 5
+    else:                       # Pure RT35 (Fallback)
+        pcm = 1
+        eg = 0
+        
+    # 2. Determine Nanoparticle Type
+    if 'al' in filename: 
+        np_type = 1
+    elif 'cu' in filename: 
+        np_type = 2
+    elif 'ti' in filename: 
+        np_type = 3
+    else: 
+        np_type = 0 # Pure PCM
+        
+    # 3. Determine Concentration
+    if 'nei.csv' in filename or 'rt35.csv' in filename or 'rteg.csv' in filename:
+        conc = 0.0
+    else:
+        try:
+            # Extracts the number (1, 3, or 5) from "Discharge_1_Al.csv"
+            conc = float([char for char in filename.split('_') if char.isdigit()][0])
+        except:
+            conc = 0.0
+
+   # -------------------------------------------------------------
+    # DATA EXTRACTION WITH .ILOC (100% of the Data!)
+    # -------------------------------------------------------------
+    time_steps = df.iloc[:, 0].values
+    temps = df.iloc[:, 1].values
+    socs = df.iloc[:, 2].values
+    
+    # Build the training matrix
+    for i in range(len(time_steps)):
+        X_list.append([time_steps[i], pcm, eg, np_type, conc])
+        y_list.append([temps[i], socs[i]])
+X = np.array(X_list)
+y = np.array(y_list)
+
+print(f"Loaded {len(X)} data points.")
+
+from sklearn.ensemble import RandomForestRegressor
+
+# ==============================================================================
+# 2. TRAIN THE MULTI-OUTPUT RANDOM FOREST (The 99% Upgrade)
+# ==============================================================================
+print("\nTraining Multi-Output Random Forest Digital Twin...")
+
+# Random Forest does not require StandardScaler, but keeping it doesn't hurt!
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Build a forest of 100 decision trees to map the thermal curves
+rf_twin = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+rf_twin.fit(X_scaled, y)
+
+print(f"Training Complete! Overall Accuracy (R^2): {rf_twin.score(X_scaled, y)*100:.2f}%")
+
+# ==============================================================================
+# 3. THE ON-DEMAND PREDICTION FUNCTION
+# ==============================================================================
+def predict_battery_state(target_time, pcm_val, eg_val, np_val, conc_val):
+    user_input = np.array([[target_time, pcm_val, eg_val, np_val, conc_val]])
+    user_input_scaled = scaler.transform(user_input)
+    
+    # Predict using the new Random Forest Twin!
+    prediction = rf_twin.predict(user_input_scaled)[0]
+    
+    print("-" * 50)
+    print(f"At Time = {target_time} seconds:")
+    print(f"Predicted Temperature : {prediction[0]:.2f} K")
+    print(f"Predicted SOC         : {prediction[1] * 100:.2f} %")
+    print("-" * 50)
+
+# Test it out!
+# predict_battery_state(target_time=1845.0, pcm_val=1, eg_val=5, np_val=1, conc_val=4.94)
+
+# ==============================================================================
+# 3. THE ON-DEMAND PREDICTION FUNCTION
+# ==============================================================================
+def predict_battery_state(target_time, pcm_val, eg_val, np_val, conc_val):
+    """
+    Query the AI for the exact Temperature and SOC at any given second.
+    """
+    # Create the input array matching our trained format
+    user_input = np.array([[target_time, pcm_val, eg_val, np_val, conc_val]])
+    user_input_scaled = scaler.transform(user_input)
+    
+    # Predict!
+    prediction = rf_twin.predict(user_input_scaled)[0]
+    predicted_temp = prediction[0]
+    predicted_soc = prediction[1]
+    
+    print("-" * 50)
+    print(f"At Time = {target_time} seconds:")
+    print(f"Predicted Temperature : {predicted_temp:.2f} K")
+    print(f"Predicted SOC         : {predicted_soc * 100:.2f} %")
+    print("-" * 50)
+
+# ==============================================================================
+# 4. TEST IT OUT!
+# ==============================================================================
+print("\n--- Testing the On-Demand Function ---")
+
+# Let's ask the AI: What happens at exactly 1,845 seconds using 
+# RT35 (1), 5% EG, Aluminum (1), at 4.94% concentration?
+predict_battery_state(target_time=1845.0, pcm_val=1, eg_val=5, np_val=1, conc_val=4.94)
+
+# You can copy and paste this function call as many times as you want!
+# predict_battery_state(target_time=3900.5, pcm_val=0, eg_val=0, np_val=2, conc_val=2.5)
+
+# ==============================================================================
+# 4. CALCULATE RIGOROUS ERROR METRICS (MAE, RMSE, R^2)
+# ==============================================================================
+print("\nCalculating rigorous error metrics for the Digital Twin...")
+
+# Ask the model to predict on the entire dataset to check its errors
+predictions = rf_twin.predict(X_scaled)
+
+# Calculate R^2 (Overall Accuracy)
+r2_score = rf_twin.score(X_scaled, y) * 100
+
+# Calculate Temperature Errors (Column 0)
+mae_temp = mean_absolute_error(y[:, 0], predictions[:, 0])
+rmse_temp = np.sqrt(mean_squared_error(y[:, 0], predictions[:, 0]))
+
+# Calculate SOC Errors (Column 1)
+mae_soc = mean_absolute_error(y[:, 1], predictions[:, 1]) * 100 # Converted to %
+rmse_soc = np.sqrt(mean_squared_error(y[:, 1], predictions[:, 1])) * 100 # Converted to %
+
+print("-" * 50)
+print(f"DIGITAL TWIN PERFORMANCE METRICS")
+print("-" * 50)
+print(f"Overall Accuracy (R^2) : {r2_score:.2f}%")
+print(f"Temperature MAE        : {mae_temp:.4f} K")
+print(f"Temperature RMSE       : {rmse_temp:.4f} K")
+print(f"SOC MAE                : {mae_soc:.4f} %")
+print(f"SOC RMSE               : {rmse_soc:.4f} %")
+print("-" * 50)
+
+# ==============================================================================
+# 5. PLOT THE BASELINE CONTROL GRAPH (3 BASE PCMS)
+# ==============================================================================
+print("\nGenerating Baseline PCM Comparison Graph...")
+
+# Create a continuous, smooth timeline from 0 to 4000 seconds
+time_future = np.linspace(0, 4000, 1000) 
+
+# 1. Predict Baseline 1: Pure N-eicosane [PCM=0, EG=0, NP=0, Conc=0]
+X_nei = np.column_stack((time_future, np.full(1000, 0), np.full(1000, 0), np.full(1000, 0), np.full(1000, 0)))
+temp_nei = rf_twin.predict(scaler.transform(X_nei))[:, 0]
+
+# 2. Predict Baseline 2: Pure RT35 [PCM=1, EG=0, NP=0, Conc=0]
+X_rt35 = np.column_stack((time_future, np.full(1000, 1), np.full(1000, 0), np.full(1000, 0), np.full(1000, 0)))
+temp_rt35 = rf_twin.predict(scaler.transform(X_rt35))[:, 0]
+
+# 3. Predict Baseline 3: RT35 + 5% EG [PCM=1, EG=5, NP=0, Conc=0]
+X_rteg = np.column_stack((time_future, np.full(1000, 1), np.full(1000, 5), np.full(1000, 0), np.full(1000, 0)))
+temp_rteg = rf_twin.predict(scaler.transform(X_rteg))[:, 0]
+
+# ------------------------------------------------------------------------------
+# DRAW THE GRAPH
+# ------------------------------------------------------------------------------
+plt.figure(figsize=(10, 6))
+
+# Plot the 3 baseline PCMs
+plt.plot(time_future, temp_nei, color='#7f7f7f', linestyle='--', linewidth=2.5, label='N-eicosane (Pure)')
+plt.plot(time_future, temp_rt35, color='#1f77b4', linestyle='-.', linewidth=2.5, label='RT35 (Pure)')
+plt.plot(time_future, temp_rteg, color='#2ca02c', linestyle='-', linewidth=3.0, label='RT35 + 5% Expanded Graphite (EG)')
+
+# Formatting for Thesis
+plt.title('Transient Thermal Performance: Base Phase Change Materials', fontsize=14, fontweight='bold')
+plt.xlabel('Time (Seconds)', fontsize=12, fontweight='bold')
+plt.ylabel('Module Peak Temperature (K)', fontsize=12, fontweight='bold')
+
+# Grid and Legend
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.legend(fontsize=11, loc='upper left', framealpha=1, shadow=True)
+
+# Save the baseline graph
+output_graph = 'Baseline_PCM_Comparison.png'
+plt.savefig(output_graph, dpi=300, bbox_inches='tight')
+
+print(f"Baseline graph successfully generated and saved as '{output_graph}'!")
+plt.show()
+
+# ==============================================================================
+# 5. VIRTUAL GRID SEARCH OPTIMIZER (Using the Digital Twin)
+# ==============================================================================
+print("\nInitiating Virtual Grid Search using the Digital Twin...")
+print("Scanning all possible material combinations and concentrations...")
+
+# Define the boundaries of our physical search space
+pcms = [0, 1]                  # 0: N-eicosane, 1: RT35
+egs = [0, 5]                   # 0% or 5% Expanded Graphite
+nps = [1, 2, 3]                # 1: Al2O3, 2: CuO, 3: TiO2
+concentrations = np.arange(0.0, 5.1, 0.1) # Sweeps from 0.0% to 5.0% in 0.1% steps
+
+# We want to minimize the peak temperature (which occurs at the end of discharge)
+target_time = 4000.0 
+
+best_temp = float('inf')
+best_config = {}
+
+# Run the sweeping search
+for pcm in pcms:
+    for eg in egs:
+        # PHYSICAL CONSTRAINT RULE
+        # N-eicosane cannot be mixed with Expanded Graphite
+        if pcm == 0 and eg > 0:
+            continue
+            
+        for np_type in nps:
+            for conc in concentrations:
+                # 1. Create the query for the Digital Twin
+                test_input = np.array([[target_time, pcm, eg, np_type, conc]])
+                test_input_scaled = scaler.transform(test_input)
+                
+                # 2. Ask the AI what the peak temperature would be
+                pred_temp = rf_twin.predict(test_input_scaled)[0][0]
+                
+                # 3. If this is the coolest temperature we've seen, save it!
+                if pred_temp < best_temp:
+                    best_temp = pred_temp
+                    best_config = {
+                        'PCM': 'RT35' if pcm == 1 else 'N-eicosane',
+                        'EG': eg,
+                        'NP': ['None', 'Al2O3', 'CuO', 'TiO2'][np_type],
+                        'Conc': conc,
+                        'Peak_Temp': pred_temp
+                    }
+
+# ==============================================================================
+# 6. PRINT THE ULTIMATE WINNER
+# ==============================================================================
+print("   DIGITAL TWIN OPTIMAL CONFIGURATION DISCOVERED")
+print(f"Base Phase Change Material : {best_config['PCM']}")
+print(f"Expanded Graphite (EG) %   : {best_config['EG']}%")
+print(f"Nanoparticle Type          : {best_config['NP']}")
+print(f"Optimal Concentration      : {best_config['Conc']:.1f}%")
+print("-" * 50)
+print(f"Predicted Peak Temperature at 4000s: {best_config['Peak_Temp']:.2f} K")
+print("-" * 50)

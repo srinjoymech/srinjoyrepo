@@ -1,0 +1,52 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# ==============================================================================
+# 1. LOAD YOUR 3 CSV FILES
+# ==============================================================================
+file_1 = r'C:\Users\HP\OneDrive\Documents\MATLAB\Examples\R2025a\simscapebattery\BatteryCCCVExample\Plots\RT35\Discharge_5_Al.csv'
+file_2 = r'C:\Users\HP\OneDrive\Documents\MATLAB\Examples\R2025a\simscapebattery\BatteryCCCVExample\Plots\RT35\Discharge_5_Cu.csv'
+file_3 = r'C:\Users\HP\OneDrive\Documents\MATLAB\Examples\R2025a\simscapebattery\BatteryCCCVExample\Plots\RT35\Discharge_5_Ti.csv'
+
+df1 = pd.read_csv(file_1) 
+df2 = pd.read_csv(file_2) 
+df3 = pd.read_csv(file_3) 
+
+# ==============================================================================
+# 2. CLEAN THE COLUMN NAMES (The Magic Fix!)
+# ==============================================================================
+# This instantly removes all accidental spaces at the start/end of every column name
+df1.columns = df1.columns.str.strip()
+df2.columns = df2.columns.str.strip()
+df3.columns = df3.columns.str.strip()
+
+# Now define your columns. 
+# (If your CSV says "Temp (in K)" in the middle, type it exactly like that below)
+x_col = 'Time'
+y_col = 'Temp (in K)' 
+
+# ==============================================================================
+# 3. PLOT THE 3 CURVES
+# ==============================================================================
+plt.figure(figsize=(10, 6))
+
+plt.plot(df1[x_col], df1[y_col], color='#1f77b4', linestyle='-', linewidth=2.5, label='RT35 + 5% Al2O3')
+plt.plot(df2[x_col], df2[y_col], color='#d62728', linestyle='--', linewidth=2.5, label='RT35 + 5% CuO')
+plt.plot(df3[x_col], df3[y_col], color='#2ca02c', linestyle=':', linewidth=2.5, label='RT35 + 5% TiO2')
+
+# ==============================================================================
+# 4. FORMATTING FOR THESIS
+# ==============================================================================
+plt.title('Transient Thermal Performance Comparison (RT35 and 5% Nanoparticle Concentration)', fontsize=14, fontweight='bold')
+plt.xlabel('Time (Seconds)', fontsize=12, fontweight='bold')
+plt.ylabel('Module Peak Temperature (K)', fontsize=12, fontweight='bold')
+
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.legend(fontsize=11, loc='best', framealpha=1, shadow=True)
+
+# Save and Display
+output_filename = 'RT35_5NP.png'
+plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+
+print(f"Graph successfully saved as '{output_filename}'!")
+plt.show()

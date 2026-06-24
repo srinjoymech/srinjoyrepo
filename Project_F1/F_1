@@ -3,11 +3,50 @@ import pandas as pd
 
 fastf1.Cache.enable_cache(r'C:\Users\HP\Python\Project_F1')
 
-years = [2021, 2022, 2023, 2024]
+years = [2022, 2023, 2024]
+all_race_data = []
 
-with pd.ExcelWriter('AbuDhabi_GP_Results_2021_2024.xlsx', engine='openpyxl') as excel_writer:
-    for year in years:
-        race = fastf1.get_session(year, 'Abu Dhabi', 'R')
-        race.load()
-        race_results = race.results
-        race_results.to_excel(excel_writer, sheet_name=str(year), index=False)
+for year in years:
+    print(f"Processing {year} season...")
+    
+    # Get the schedule for the year
+    schedule = fastf1.get_event_schedule(year)
+    
+    for index, event in schedule.iterrows():
+        # Skip testing and sprint qualifying sessions
+        if event['EventFormat'] == 'testing':
+            continue
+            
+        race_name = event['EventName']
+        
+        try:
+            # Load race session
+            race = fastf1.get_session(year, race_name, 'R')
+            race.load()
+            
+            # Get race results
+            race_results = race.results.copy()
+            
+            # Add identifying columns
+            race_results['Year'] = year
+            race_results['RaceName'] = race_name
+            race_results['RoundNumber'] = event['RoundNumber']
+            race_results['Country'] = event['Country']
+            race_results['Location'] = event['Location']
+            race_results['EventDate'] = event['EventDate']
+            
+            all_race_data.append(race_results)
+            print(f"  ✓ Loaded {race_name}")
+            
+        except Exception as e:
+            print(f"  ✗ Error loading {year} {race_name}: {e}")
+
+# Combine all data into one DataFrame
+df_all_races = pd.concat(all_race_data, ignore_index=True)
+
+# Save to Excel with all races in one sheet
+df_all_races.to_excel('F1_Race_Results_2022_2024.xlsx', index=False)
+
+print(f"\nTotal races collected: {len(all_race_data)}")
+print(f"Total rows: {len(df_all_races)}")
+print(f"Data saved to F1_Race_Results_2022_2024.xlsx")
