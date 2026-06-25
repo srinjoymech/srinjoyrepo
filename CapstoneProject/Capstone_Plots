@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -50,7 +49,7 @@ output_filename = 'RT35_5NP.png'
 plt.savefig(output_filename, dpi=300, bbox_inches='tight')
 
 print(f"Graph successfully saved as '{output_filename}'!")
-=======
+
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -102,5 +101,5 @@ output_filename = 'RT35_5NP.png'
 plt.savefig(output_filename, dpi=300, bbox_inches='tight')
 
 print(f"Graph successfully saved as '{output_filename}'!")
->>>>>>> 5e255b85b3c975876b017cc5b0e06827e7ad8050
+
 plt.show()
