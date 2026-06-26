@@ -1,52 +1,23 @@
 import fastf1
-import pandas as pd
+from fastf1 import plotting
+import matplotlib.pyplot as plt
+# import pandas as pd
+# import numpy as np
+# import openpyxl as pxl
+fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
+# cache=fastf1.Cache.enable_cache('cache')  # Enable caching to speed up data retrieval
+session=fastf1.get_session(2026,7,'R')  #Race
+session.load()
 
-fastf1.Cache.enable_cache(r'C:\Users\HP\Python\Project_F1')
+fig, ax = plt.subplots(figsize=(10, 8))
+for driver in ('LEC','HAM'):
+    laps= session.laps.pick_drivers(driver)
+    style = plotting.get_driver_style(identifier=driver,
+                                      style=['color', 'linestyle'],
+                                      session=session)
+    ax.plot(laps['LapNumber'],laps['LapTime'],**style,label=driver)
 
-years = [2022, 2023, 2024]
-all_race_data = []
-
-for year in years:
-    print(f"Processing {year} season...")
-    
-    # Get the schedule for the year
-    schedule = fastf1.get_event_schedule(year)
-    
-    for index, event in schedule.iterrows():
-        # Skip testing and sprint qualifying sessions
-        if event['EventFormat'] == 'testing':
-            continue
-            
-        race_name = event['EventName']
-        
-        try:
-            # Load race session
-            race = fastf1.get_session(year, race_name, 'R')
-            race.load()
-            
-            # Get race results
-            race_results = race.results.copy()
-            
-            # Add identifying columns
-            race_results['Year'] = year
-            race_results['RaceName'] = race_name
-            race_results['RoundNumber'] = event['RoundNumber']
-            race_results['Country'] = event['Country']
-            race_results['Location'] = event['Location']
-            race_results['EventDate'] = event['EventDate']
-            
-            all_race_data.append(race_results)
-            print(f"  ✓ Loaded {race_name}")
-            
-        except Exception as e:
-            print(f"  ✗ Error loading {year} {race_name}: {e}")
-
-# Combine all data into one DataFrame
-df_all_races = pd.concat(all_race_data, ignore_index=True)
-
-# Save to Excel with all races in one sheet
-df_all_races.to_excel('F1_Race_Results_2022_2024.xlsx', index=False)
-
-print(f"\nTotal races collected: {len(all_race_data)}")
-print(f"Total rows: {len(df_all_races)}")
-print(f"Data saved to F1_Race_Results_2022_2024.xlsx")
+ax.set_xlabel("Lap Number")
+ax.set_ylabel("Lap Time")
+plotting.add_sorted_driver_legend(ax, session)
+plt.show()
