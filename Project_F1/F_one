@@ -1,37 +1,44 @@
 import fastf1
+from fastf1 import plotting
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
 
-event=fastf1.get_event(2023,20)
-session=event.get_race() 
+fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
+session=fastf1.get_session(2026,7,'R')      #Barcelona GP, continuing from the Time vs Lap
 session.load()
+laps= session.laps
+drivers=session.drivers
+drivers=[session.get_driver(driver)["Abbreviation"] for driver in drivers]
+# print(drivers)
 
-columns = [
-    'Driver', 'DriverNumber', 'LapTime', 'LapNumber',
-    'Sector1Time', 'Sector2Time', 'Sector3Time',
-    'SpeedI1', 'SpeedI2', 'SpeedFL', 'SpeedST'
-]
-# lap_ver=session.laps.pick_driver('VER')[columns]
-# lap_ham=session.laps.pick_driver('HAM')[columns]
+stints=laps[["Driver","Stint","Compound","LapNumber"]]
+stints=stints.groupby(["Driver","Stint","Compound"])
+stints=stints.count().reset_index()
+stints = stints.rename(columns={"LapNumber": "StintLength"})
+# print(stints)
 
-# lap_ver['Driver']='VER'
-# lap_ham['Driver']='HAM'
+fig, ax = plt.subplots(figsize=(3, 5))
+for driver in ('LEC','HAM'):
+    driver_stints=stints.loc[stints["Driver"]==driver]
+    previous_stint_end=0
+    for idx, row in driver_stints.iterrows():
+        compound_colour=fastf1.plotting.get_compound_color(row["Compound"],session=session)
+        plt.barh(
+            y=driver,
+            width=row["StintLength"],
+            left=previous_stint_end,
+            color=compound_colour,
+            edgecolor="black",
+            fill=True
+        )
+        previous_stint_end += row["StintLength"]
+plt.title("2026 Spanish GP Tyre Compounds (Leclerc vs Hamilton)")
+plt.xlabel("Lap Number")
+plt.grid(False)
+ax.invert_yaxis()
 
-# combined_laps = pd.concat([lap_ver, lap_ham])
-
-# for col in ['LapTime', 'Sector1Time', 'Sector2Time', 'Sector3Time']:
-#     combined_laps[col] = combined_laps[col].dt.total_seconds()
-
-# speed_columns = ['SpeedI1', 'SpeedI2', 'SpeedFL', 'SpeedST']  # list all speed columns with missing values
-
-# for col in speed_columns:
-#     mean_value = combined_laps[col].mean()  # calculate mean excluding NaNs
-#     combined_laps[col] = combined_laps[col].fillna(mean_value)  # fill NaNs with column mean
-
-# combined_laps=combined_laps[combined_laps['LapTime']>0]
-# combined_laps=combined_laps[combined_laps['Sector1Time']>0]
-
-# combined_laps.to_excel('ver_ham_laptimes.xlsx', index=False)
-
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.spines['left'].set_visible(False)
+plt.tight_layout()
+plt.show()
