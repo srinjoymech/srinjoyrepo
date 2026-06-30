@@ -1,0 +1,20 @@
+import fastf1
+from fastf1 import plotting
+import matplotlib.pyplot as plt
+
+fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
+session=fastf1.get_session(2026,8,'R')
+session.load()
+
+fig,ax= plt.subplots(figsize=(12,10))
+for driver in ('HAM','LEC','VER','HAD','RUS','ANT','NOR','PIA'):
+    laps=session.laps.pick_drivers(driver)
+    style=plotting.get_driver_style(identifier=driver,
+                                    style=['color', 'linestyle'],
+                                    session=session)
+    ax.plot(laps['LapNumber'],laps['LapTime'],**style,label=driver)
+plt.title("Lap Times of the Top 8")
+ax.set_xlabel('LapNumber')
+ax.set_ylabel('LapTime')
+plotting.add_sorted_driver_legend(ax, session)
+plt.show()
